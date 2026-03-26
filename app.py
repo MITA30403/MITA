@@ -23,19 +23,3 @@ str(random.randint(1,10))
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=5000, debug=True)
-
-
-
-2. 
-
-requirements.txt
-
-
-Flask==3.0.3
-gunicorn==23.0.0
-
-
-
-render 명령어: 
-
-gunicorn app:app
