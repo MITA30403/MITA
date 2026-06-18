@@ -1,39 +1,48 @@
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
+import requests
+from bs4 import BeautifulSoup
 import random
 
 app = Flask(__name__)
 
-books = [
-    "지적 대화를 위한 넓고 얕은 지식",
-    "정의란 무엇인가",
-    "무소유",
-    "사피엔스",
-    "코스모스",
-    "총, 균, 쇠",
-    "방구석 미술관",
-    "영어회화 100일의 기적",
-    "어린 왕자",
-    "거꾸로 읽는 세계사"
-]
-
-@app.route("/")
-def home():
-    return "Book Bot Running!"
-
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    book = random.choice(books)
+
+    url = "https://store.kyobobook.co.kr/bestseller/online/daily"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
+    res = requests.get(url, headers=headers)
+    soup = BeautifulSoup(res.text, "html.parser")
+
+    books = []
+
+    # 교보문고 제목 추출 (여러 구조 대비)
+    for tag in soup.find_all(["a", "span"]):
+        text = tag.get_text(strip=True)
+        if text and len(text) > 5:
+            if "원" not in text:  # 가격 제거용 필터
+                books.append(text)
+
+    # 중복 제거
+    books = list(set(books))
+
+    if books:
+        book = random.choice(books)
+        result = f"📚 오늘의 교보문고 추천\n\n📖 {book}"
+    else:
+        result = "도서 정보를 가져오지 못했습니다."
 
     return jsonify({
         "version": "2.0",
         "template": {
-            "outputs": [
-                {
-                    "simpleText": {
-                        "text": f"📚 오늘의 추천 도서\n\n📖 {book}"
-                    }
+            "outputs": [{
+                "simpleText": {
+                    "text": result
                 }
-            ]
+            }]
         }
     })
 
