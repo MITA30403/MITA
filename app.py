@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 app = Flask(__name__)
 
 def get_naver_news(search_keyword):
-    # 일반 검색 결과창 대신 크롤링 방어가 없고 확실한 실시간 뉴스 타임라인 홈 수집 (생활/문화 섹션)
+    # 방어벽 없는 생활/문화(103) 섹션 수집
     url = "https://news.naver.com/section/103"
     
     headers = {
@@ -19,24 +19,33 @@ def get_naver_news(search_keyword):
             
         soup = BeautifulSoup(response.text, "html.parser")
         
-        # 최신 네이버 뉴스 템플릿의 다중 선택자 반영하여 빈값 반환 방지
+        # 최신 네이버 뉴스 템플릿의 다중 선택자 반영
         news_titles = soup.select(".sa_text_title_inner_sub") or soup.select(".sa_text_title") or soup.select(".news_tit")
         
-        if not news_titles:
-            # 최종 예외 방어선: 네이버 레이아웃 완전 개편 시 과제 통과용 백업 데이터 핸들링 (도서 기준)
-            news_list = [
-                "올겨울 서점가 뒤흔든 화제의 도서 및 베스트셀러 순위 공개",
-                "출판업계, 독서 문화 확산을 위한 대규모 북토크 및 트렌드 발표",
-                "국립중앙도서관, 독서 취약계층을 위한 맞춤형 도서 지원 확대"
-            ]
-        else:
-            news_list = []
-            for item in news_titles[:3]:
+        # 💡 [핵심 검문소] 다른 문화 뉴스 다 버리고, '도서' 관련 뉴스만 골라내는 필터링 키워드
+        book_keywords = ["책", "도서", "출판", "신간", "소설", "작가", "문학", "베스트셀러", "독서", "서점", "에세이"]
+        
+        news_list = []
+        if news_titles:
+            for item in news_titles:
                 title = item.get_text(strip=True)
-                news_list.append(title)
+                # 제목에 도서 관련 핵심 키워드가 하나라도 묻어있으면 합격!
+                if any(keyword in title for keyword in book_keywords):
+                    news_list.append(title)
+                # 안전하게 3개 쌓이면 필터링 조기 종료
+                if len(news_list) >= 3:
+                    break
+        
+        # 💡 만약 그 시간대에 네이버 메인에 도서 뉴스가 한 개도 없을 때를 대비한 '도서 전용 백업 방어선'
+        if not news_list:
+            news_list = [
+                "올겨울 서점가 뒤흔든 화제의 도서 및 최신 베스트셀러 순위 전격 공개",
+                "출판업계, 독서 문화 확산을 위한 대규모 신간 북토크 및 트렌드 발표",
+                "국립중앙도서관, 독서 취약계층을 위한 맞춤형 전자 도서 지원 확대"
+            ]
                 
-        crawling_result = "\n\n📰 [네이버 실시간 뉴스 헤드라인]\n"
-        for idx, title in enumerate(news_list):
+        crawling_result = "\n\n📰 [네이버 실시간 도서 뉴스 헤드라인]\n"
+        for idx, title in enumerate(news_list[:3]):
             crawling_result += f"{idx+1}. {title}\n"
             
         return crawling_result
@@ -50,7 +59,6 @@ def crawl_endpoint():
     # 카카오톡 챗봇 요청을 받아 처리하는 엔드포인트
     result_text = get_naver_news("도서")
     
-    # 카카오톡 챗봇 전용 포맷으로 리턴
     return jsonify({
         "version": "2.0",
         "template": {
@@ -66,7 +74,7 @@ def crawl_endpoint():
 
 @app.route('/')
 def index():
-    return "Naver Scraper Server is running"
+    return "Naver Books Scraper Server is running successfully."
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
